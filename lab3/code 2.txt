@@ -1,0 +1,67 @@
+import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+
+public class Main {
+    static int SIZE = 50000;
+
+    static long minSerial = 0;
+    static int minSerialIndex = 0;
+
+    static long minBlocked = 0;
+    static int minBlockedIndex = 0;
+
+    public static ArrayList<Long> getRandomArray(ArrayList<Long> array) {
+        long randMin = -501L, randMax = 500L;
+        for (int i = 0; i < SIZE; i++) {
+            array.add((long) (randMin + (Math.random() * randMax)));
+        }
+        // System.out.println(array.toString());
+        return array;
+    }
+
+    public static void main(String[] args) {
+        ArrayList<Long> array = new ArrayList<>();
+        getRandomArray(array);
+        
+        minSerial = array.get(0);
+        array.forEach(element -> {
+            if (element < minSerial)
+                minSerial = element;
+            minSerialIndex = array.indexOf(element);
+        });
+
+        AtomicLong atomicMin = new AtomicLong();
+        AtomicLong atomicMinIndex = new AtomicLong();
+
+        minBlocked = array.get(0);
+        atomicMin.compareAndSet(atomicMin.get(), array.get(0));
+        atomicMinIndex.compareAndSet(atomicMin.get(), 0);
+
+        array.parallelStream().forEach(element -> {
+            // Blocked
+            if (element < minBlocked)
+                minBlocked = element;
+            minBlockedIndex = array.indexOf(element);
+            // Atomic
+            long oldValue, newValue, oldIndex, newIndex;
+            long index = array.indexOf(element);
+            do {
+                oldValue = atomicMin.get();
+                oldIndex = atomicMinIndex.get();
+                if (element >= oldValue)
+                    break;
+                newValue = element;
+                newIndex = index;
+            } while (!(atomicMin.compareAndSet(oldValue, newValue) && atomicMinIndex.compareAndSet(oldIndex, newIndex)));
+        });
+
+
+        System.out.println("Serial min:   " + minSerial);
+        System.out.println("Serial index:   " + minSerialIndex);
+        System.out.println("Blocked min:   " + minBlocked);
+        System.out.println("Blocked index:   " + minBlockedIndex);
+        System.out.println("Atomic min:   " + atomicMin.get());
+        System.out.println("Atomic index:   " + atomicMinIndex.get());
+    }
+}

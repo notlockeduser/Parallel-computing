@@ -1,0 +1,57 @@
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Stream;
+
+public class Main {
+    static int SIZE = 50000;
+
+    static Item minSerial =  new Item(0,0);
+
+    static Item minBlocked = new Item(0,0);
+
+
+    public static Item[] getRandomArray(Item[] array) {
+        long randMin = -501L, randMax = 500L;
+        for (int i = 0; i < SIZE; i++) {
+            array[i] = new Item((long) (randMin + (Math.random() * randMax)), i);
+        }
+        //array[200].data =-501;
+        return array;
+    }
+
+    public static void main(String[] args) {
+        Item[] array = new Item[SIZE];
+        getRandomArray(array);
+
+        minSerial = array[0];
+        Arrays.stream(array).forEach(element -> {
+            if (element.data < minSerial.data)
+                minSerial = element;
+        });
+
+        AtomicReference<Item> atomicMin = new AtomicReference<>();
+        atomicMin.compareAndSet(atomicMin.get(),array[0]);
+
+        Stream.of(array).parallel().forEach(element -> {
+            if (element.data < minBlocked.data)
+                minBlocked = element;
+            // Atomic
+            Item oldValue, newValue;
+            do {
+                oldValue = atomicMin.get();
+                if (element.data >= oldValue.data)
+                    break;
+                newValue = element;
+            } while (!atomicMin.compareAndSet(oldValue, newValue));
+        });
+
+        System.out.println("Serial min:   " + minSerial.data);
+        System.out.println("Serial index:   " + minSerial.index);
+        System.out.println("Blocked min:   " + minBlocked.data);
+        System.out.println("Blocked index:   " + minBlocked.index);
+        System.out.println("Atomic min:   " + atomicMin.get().data);
+        System.out.println("Atomic index:   " + atomicMin.get().index);
+    }
+}

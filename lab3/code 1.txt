@@ -1,0 +1,28 @@
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
+public class Main {
+    static int sum = 0;
+
+    public static void main(String[] args) {
+        int array[] = new int [1000000]; /* long array[] = new Random().longs(SIZE).toArray();*/
+
+        Arrays.fill(array,1);
+        int serialSum = IntStream.of(array).reduce(0, (a, b) -> a ^ b);
+
+        AtomicInteger atomicSum = new AtomicInteger(); /*створення атомарної змінної (atomic variable)*/
+        IntStream.of(array).parallel().forEach( arrayElement -> {   /*вбудований метод для виконання паралельних обчислень у Java*/
+            sum ^= arrayElement;    /*знаходження суми без використання атомарної змінної*/
+            int oldValue;
+            int newValue;
+            do{ //зміна суми з використанням методу compareAndSet
+                oldValue = atomicSum.get();
+                newValue = oldValue ^ arrayElement;
+            }while(!atomicSum.compareAndSet(oldValue , newValue));
+        });
+
+        System.out.println("Serial sum:   " + serialSum);
+        System.out.println("Blocking sum: " + sum);
+        System.out.println("Atomic sum:   " + atomicSum.get());
+    }
+}

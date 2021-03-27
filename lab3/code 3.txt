@@ -1,0 +1,69 @@
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicLongArray;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.LongStream;
+import java.util.stream.Stream;
+
+public class Main {
+    static int SIZE = 50000;
+
+    public static long[] getRandomArray(long[] array) {
+        long randMin = 0L, randMax = 50L;
+        for (int i = 0; i < SIZE; i++) {
+            array[i] = ((long) (randMin + (Math.random() * randMax)));
+        }
+        // System.out.println(array.toString());
+        return array;
+    }
+
+    public static void main(String[] args) {
+        long array[] = new long[SIZE];
+        getRandomArray(array);
+
+        long max = LongStream.of(array).max().getAsLong();
+
+        long[] dictionarySerial = new long[(int) (max+1)];
+        long[] dictionaryBlocked = new long[(int) (max+1)];
+        AtomicLongArray dictionary = new AtomicLongArray((int) max + 1);
+
+        LongStream.of(array).forEach(element -> {
+            dictionarySerial[(int) element]++;
+        });
+
+        LongStream.of(array).parallel().forEach(element -> {
+            dictionaryBlocked[(int) element]++;
+            long oldValue;
+            long newValue;
+            do {
+                oldValue = dictionary.get((int) element);
+                newValue = oldValue + 1;
+            } while (!dictionary.compareAndSet((int) element, oldValue, newValue));
+        });
+
+        long mode = 0, modeSerial = 0, modeBlocked = 0;
+        long modeIndex = 0, modeSerialIndex = 0, modeBlockedIndex = 0;
+        for (int i = 0; i < dictionary.length(); i++) {
+            if (mode < dictionary.get(i)) {
+                mode = dictionary.get(i);
+                modeIndex = i;
+            }
+            if (modeSerial < dictionarySerial[i]) {
+                modeSerial = dictionarySerial[i];
+                modeSerialIndex = i;
+            }
+            if (modeBlocked < dictionaryBlocked[i]) {
+                modeBlocked = dictionaryBlocked[i];
+                modeBlockedIndex = i;
+            }
+        }
+
+        System.out.println("Mode serial "+ modeSerialIndex + " with count " + modeSerial);
+        System.out.println("Mode blocke "+ modeBlockedIndex + " with count " + modeBlocked);
+        System.out.println("Mode atomic "+ modeIndex + " with count " + mode);
+    }
+}
